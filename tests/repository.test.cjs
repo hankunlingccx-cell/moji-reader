@@ -217,8 +217,9 @@ test('AI batch retry is idempotent and existing manual highlights are never over
   const { repo } = setup(); await create(repo, 'manual note');
   const manual = (await repo.list()).records[0], batch = aiBatch(); batch.items.push({ ...batch.items[0], index: 1, anchor: manual.anchor });
   const first = await repo.createAiBatch(batch), retried = await repo.createAiBatch(batch);
-  assert.equal(first.createdCount, 1); assert.equal(first.skipped.length, 1); assert.equal(retried.replayed, true);
-  assert.equal((await repo.list()).records.length, 2); assert.equal((await repo.list()).records.find(r => r.id === manual.id).note, 'manual note');
+  assert.equal(first.createdCount, 2); assert.equal(first.skipped.length, 0); assert.equal(retried.replayed, true);
+  assert.equal((await repo.list()).records.length, 3); assert.equal((await repo.list()).records.find(r => r.id === manual.id).note, 'manual note');
+  assert.ok((await repo.list()).records.filter(r => r.aiSource === 'codex').every(r => r.styles.underline && !r.styles.highlight));
   await assert.rejects(repo.createAiBatch({ ...batch, task: 'different' }), /另一组标注/);
 });
 test('whole-batch undo retains subsequently edited notes and leaves manual or other batches intact', async () => {
@@ -237,6 +238,18 @@ test('invalid or failed AI writes do not leave a partial batch', async () => {
   await assert.rejects(repo.createAiBatch(batch)); assert.equal((await repo.list()).records.length, 0); assert.equal((await repo.listAiBatches()).length, 0);
   storage.fail = true; await assert.rejects(repo.createAiBatch(aiBatch()), /disk full/); storage.fail = false;
   assert.equal((await repo.listAiBatches()).length, 0);
+});
+
+test('repository rejects missing or oversized AI explanations before persisting any item', async () => {
+  const { repo } = setup();
+  for (const note of ['', '字'.repeat(81)]) {
+    const batch = aiBatch(); batch.items.push({ ...batch.items[0], index: 1, note });
+    await assert.rejects(repo.createAiBatch(batch), /批注/);
+    assert.equal((await repo.list()).records.length, 0);
+    assert.equal((await repo.listAiBatches()).length, 0);
+  }
+  const batch = aiBatch(); batch.items[0].note = '字'.repeat(80);
+  assert.equal((await repo.createAiBatch(batch)).createdCount, 1);
 });
 test('AI batch undo remains available after backup import and repository restart', async () => {
   const source = setup(), target = setup(); await source.repo.createAiBatch(aiBatch());

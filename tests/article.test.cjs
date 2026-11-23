@@ -5,6 +5,12 @@ const A = require('../extension/anchor.js');
 const Article = require('../extension/article.js');
 const extract = body => Article.extract(A.buildIndex(new JSDOM(`<body>${body}</body>`).window.document));
 const sentence = 'Psychological safety helps team members express unusual ideas and improves collective creativity.';
+test('noun mode requires a real short phrase, resolves only its exact characters, and rejects ambiguous/late occurrences', () => {
+  const structure = extract('<main><h2>Results</h2><p>心理安全感促进分享。心理安全感还支持探索。</p><p>心理安全感促进团队创意。</p></main>');
+  const options = { selectionMode: 'phrase', firstOnly: true, requireNote: true }, note = '文中认为它促进分享和探索，因此属于促进因素。';
+  const result = Article.resolve(structure, [{ paragraphId: 'p1', sentenceNumbers: [1], note }, { paragraphId: 'p1', phrase: '心理安全感', note }, { paragraphId: 'p1', phrase: '心理安全感', occurrence: 2, note }, { paragraphId: 'p2', phrase: '心理安全感', note }, { paragraphId: 'p1', phrase: '心理安全感', occurrence: 1, note }], options);
+  assert.equal(result.passages.length, 1); assert.equal(result.rejected.length, 4); assert.equal(result.passages[0].quote, '心理安全感'); assert.equal(result.passages[0].selectionMode, 'phrase');
+});
 const fixture = () => extract(`<header>Journal subscriptions</header><nav>Huge navigation menu ${'noise '.repeat(1000)}</nav><main><h1>Team creativity</h1><h2>Introduction</h2><p>We examine factors that affect team creativity in organizations and explain their mechanisms.</p><div class="cookie-banner">Please accept cookies</div><h2>Results</h2><p>${sentence} Resource constraints can limit exploration.</p><p>知识多样性提供不同视角。心理安全感促进成员分享新想法。</p><h2>References</h2><p>Author et al. 2020. Bibliographic information.</p><h3>Further citations</h3><p>Other author. 2024.</p><h2>Appendix</h2><p>Supplementary evidence should remain available.</p></main><footer>Copyright policy</footer>`);
 test('semantic extraction removes navigation and consent while retaining body, headings and explicit reference sections', () => {
   const structure = fixture(), text = structure.paragraphs.map(p => p.text).join('\n');

@@ -68,11 +68,13 @@
     function locate(index, record) {
       const direct = A.locate(index, record.anchor);
       if (direct.status !== 'unanchored') return { ...direct, scope: 'selection', bilingual: capture(index, { ...record.anchor, start: direct.start, end: direct.end }) };
-      const alternatives = [...(record.bilingual?.variants || [])].sort((a, b) => (a.scope === 'paragraph') - (b.scope === 'paragraph'));
+      const precise = record.aiSelectionMode === 'phrase';
+      const alternatives = [...(record.bilingual?.variants || [])].filter(v => !precise || v.scope === 'selection').sort((a, b) => (a.scope === 'paragraph') - (b.scope === 'paragraph'));
       for (const v of alternatives) {
         const found = A.locate(index, v.anchor);
         if (found.status !== 'unanchored') return { ...found, language: v.language, scope: v.scope, bilingual: capture(index, { ...v.anchor, start: found.start, end: found.end }) };
       }
+      if (precise) return { status: 'unanchored', reason: '名词标注未找到精确的另一语言摘录。请绑定对应名词；不会扩展成整段。' };
       // Match a saved quote against the observed pre-translation paragraph, then
       // use ONLY that very same live DOM element's translation. No offset fallback.
       const candidates = [];

@@ -483,7 +483,15 @@
         if (message.type === 'moji:readDocument') respond({ ok: true, value: { ...info, text: index.text, structure: MojiArticle.extract(index) } });
         else {
           if (index.text !== message.expectedText) throw new Error('页面在定位前发生变化，请重新读取正文。');
-          const prepared = MojiAiAnchors.prepare(index.text, message.passages, message.colors);
+          const prepared = MojiAiAnchors.prepare(index.text, message.passages, message.colors, message.selectionRules);
+          if (message.selectionRules?.firstOnly && message.selectionRules?.selectionMode === 'phrase') {
+            const paragraphs = MojiArticle.extract(index).paragraphs;
+            prepared.items = prepared.items.filter(item => {
+              const earlier = paragraphs.find(p => { const offsets = MojiAnnotationRules.occurrences(p.text, item.anchor.exact); return offsets.length && p.start + offsets[0] < item.anchor.start; });
+              if (!earlier) return true;
+              prepared.rejected.push({ index: item.index, reason: `短语在 ${earlier.id} 更早出现，请选择正文首次位置。` }); return false;
+            });
+          }
           for (const item of prepared.items) { const pair = bilingual.capture(index, item.anchor); if (pair) item.bilingual = pair; }
           respond({ ok: true, value: prepared });
         }

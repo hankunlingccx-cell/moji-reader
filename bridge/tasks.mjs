@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import Article from '../extension/article.js';
+import Rules from '../extension/annotation-rules.js';
 import { CodexSession } from './codex-session.mjs';
 
 const ACTIVE = new Set(['starting', 'reading', 'writing', 'stopping']);
@@ -54,14 +55,15 @@ export class TaskManager {
   async tool(task, name, args = {}) {
     if (!['reading', 'writing'].includes(task.status)) throw new Error('任务已停止，不再读取或写入。');
     const doc = task.document;
-    if (name === 'moji_article_outline') return { title: doc.title, colors: doc.colors, sections: Article.outline(doc.structure) };
+    const selectionRules = { selectionMode: Rules.mode(task.prompt), firstOnly: Rules.firstOnly(task.prompt), requireNote: true };
+    if (name === 'moji_article_outline') return { title: doc.title, colors: doc.colors, sections: Article.outline(doc.structure), annotationStyle: 'underline', noteLimit: 80, ...selectionRules };
     if (name === 'moji_read_article') {
       const page = Article.read(doc.structure, { sectionIds: args.sectionIds, offset: args.paragraphOffset || 0, maxChars: 12000 });
       for (const p of page.paragraphs) task.readIds.add(p.id);
       task.readCount = task.readIds.size; task.status = 'reading'; task.message = `正在阅读 · 已读 ${task.readCount} 段`; await this.save(); return page;
     }
     if (name !== 'moji_highlight_passages') throw new Error('本会话仅允许读取和标注当前文章。');
-    const resolved = Article.resolve(doc.structure, args.selections);
+    const resolved = Article.resolve(doc.structure, args.selections, selectionRules);
     const passages = resolved.passages.filter(p => {
       if (task.readIds.has(args.selections[p.index].paragraphId)) return true;
       resolved.rejected.push({ index: p.index, reason: '该段落尚未读取。' }); return false;
@@ -69,7 +71,7 @@ export class TaskManager {
     if (!passages.length) { task.rejectedCount += resolved.rejected.length; await this.save(); return { createdCount: 0, rejected: resolved.rejected }; }
     task.status = 'writing'; task.message = '正在写入标注…'; await this.save();
     if (!['reading', 'writing'].includes(task.status)) throw new Error('任务已停止。');
-    const operation = this.callExtension('batch.apply', { tabId: task.tabId, url: task.url, sourceHash: doc.sourceHash, batchId: crypto.randomUUID(), taskId: task.id, label: task.prompt.slice(0, 200), task: task.prompt, passages, selectionIndices: passages.map(p => p.index), preRejected: resolved.rejected });
+    const operation = this.callExtension('batch.apply', { tabId: task.tabId, url: task.url, sourceHash: doc.sourceHash, selectionRules, batchId: crypto.randomUUID(), taskId: task.id, label: task.prompt.slice(0, 200), task: task.prompt, passages, selectionIndices: passages.map(p => p.index), preRejected: resolved.rejected });
     task.operations.add(operation);
     try {
       const result = await operation;

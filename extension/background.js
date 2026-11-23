@@ -1,4 +1,4 @@
-importScripts('palette.js', 'repository.js', 'codex-bridge.js');
+importScripts('palette.js', 'annotation-rules.js', 'repository.js', 'codex-bridge.js');
 'use strict';
 const repo = new MojiRepository.Repository(chrome.storage.local);
 function notifyChanged() { chrome.tabs.query({}).then(tabs => Promise.allSettled(tabs.map(tab => chrome.tabs.sendMessage(tab.id, { type: 'moji:changed' })))).catch(console.error); }

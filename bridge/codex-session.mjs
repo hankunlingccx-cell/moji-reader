@@ -5,7 +5,7 @@ import { readingPolicy } from './reading-policy.mjs';
 export const taskTools = [
   { type: 'function', name: 'moji_article_outline', description: '查看本次目标文章的章节目录与颜色含义。', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { type: 'function', name: 'moji_read_article', description: '读取本次文章的去噪段落和句子编号，序号从1开始；省略sectionIds读默认正文。按nextParagraphOffset续读。', inputSchema: { type: 'object', properties: { sectionIds: { type: 'array', items: { type: 'string' } }, paragraphOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
-  { type: 'function', name: 'moji_highlight_passages', description: '用已读段落/连续句子编号提交标注，免抄摘录。每条中文标签及短批注，颜色沿用当前含义。', inputSchema: { type: 'object', properties: { selections: { type: 'array', minItems: 1, maxItems: 200, items: { type: 'object', properties: { paragraphId: { type: 'string' }, sentenceNumbers: { type: 'array', items: { type: 'integer', minimum: 1 } }, color: { type: 'string', enum: ['yellow', 'blue', 'green', 'rose', 'purple'] }, label: { type: 'string' }, note: { type: 'string' } }, required: ['paragraphId', 'label', 'note'], additionalProperties: false } } }, required: ['selections'], additionalProperties: false } }
+  { type: 'function', name: 'moji_highlight_passages', description: '用已读段落/句子编号提交；名词任务必须提供精确phrase，不能选整句。每条必须有≤80字理由批注。AI默认下划线。', inputSchema: { type: 'object', properties: { selections: { type: 'array', minItems: 1, maxItems: 200, items: { type: 'object', properties: { paragraphId: { type: 'string' }, sentenceNumbers: { type: 'array', items: { type: 'integer', minimum: 1 } }, phrase: { type: 'string', description: '名词任务必填：原文中的最小完整名词短语。' }, occurrence: { type: 'integer', minimum: 1 }, color: { type: 'string', enum: ['yellow', 'blue', 'green', 'rose', 'purple'] }, label: { type: 'string' }, note: { type: 'string', minLength: 1, maxLength: 80, description: '说明为何选择及文中依据，中文不超过80字。' } }, required: ['paragraphId', 'label', 'note'], additionalProperties: false } } }, required: ['selections'], additionalProperties: false } }
 ];
 
 export class CodexSession {
@@ -24,7 +24,7 @@ export class CodexSession {
     this.child.stderr.on('data', () => {}); // No auth/config stderr is exposed to the webpage.
     this.lines = createInterface({ input: this.child.stdout });
     this.lines.on('line', line => { if (line.length > 4000000) return this.fail(new Error('Codex 返回内容过大。')); try { this.receive(JSON.parse(line)); } catch {} });
-    await this.request('initialize', { clientInfo: { name: 'moji_reader', title: 'Moji Reader', version: '1.10.1' }, capabilities: { experimentalApi: true } });
+    await this.request('initialize', { clientInfo: { name: 'moji_reader', title: 'Moji Reader', version: '1.11.0' }, capabilities: { experimentalApi: true } });
     this.send({ method: 'initialized', params: {} });
     const auth = await this.request('account/read', { refreshToken: false });
     if (!auth.account && auth.requiresOpenaiAuth) throw new Error('请先在本机运行 codex login，登录后重新开始任务。');

@@ -57,6 +57,24 @@ try {
   await page.reload(); await page.locator('#launcher').click(); await page.locator('#codex-task-panel > summary').click(); await page.locator('#task-caption').filter({ hasText: '已停止' }).waitFor();
   await page.locator('#task-undo').click(); await page.locator('#task-caption').filter({ hasText: '已撤销' }).waitFor(); assert.equal((await rpc('list')).records.filter(r => !r.deleted).length, 0);
   console.log('PASS: stop interrupts generation without deleting committed notes; page reload restores task history and whole-task undo remains available');
+  await page.evaluate(values => { document.documentElement.classList.add('translated-ltr'); values.forEach((s, i) => { document.querySelector('#p' + i).innerHTML = `<font>${s}</font>`; }); }, chinese);
+  const source = await worker.evaluate(async url => { const tab = (await chrome.tabs.query({})).find(t => t.url === url); return (await chrome.tabs.sendMessage(tab.id, { type: 'moji:readDocument' })).value.text; }, page.url());
+  const start = source.indexOf('心理安全感');
+  await rpc('mutate', { id: 'manual-noun', baseRevision: 0, opId: crypto.randomUUID(), patch: { pageKey: page.url(), title: 'Test', anchor: { exact: '心理安全感', prefix: source.slice(Math.max(0, start - 80), start), suffix: source.slice(start + 5, start + 85), start, end: start + 5, exactCount: 1 }, originalQuote: '心理安全感', color: 'yellow', label: '我的高亮', note: '用户自己的笔记。', styles: { highlight: true, underline: false, bold: false }, deleted: false } });
+  await page.locator('#retry').click();
+  await page.locator('#task-prompt').fill('只标影响团队创意的因素名词，每个名词只标第一次出现，并写明理由。'); await page.locator('#task-start').click(); await page.locator('#task-caption').filter({ hasText: '已完成' }).waitFor();
+  const nouns = (await rpc('list')).records.filter(r => !r.deleted && r.aiTaskId);
+  assert.deepEqual(nouns.map(r => r.anchor.exact).sort(), ['心理安全感', '过高的时间压力'].sort());
+  assert.ok(nouns.every(r => r.styles.underline && !r.styles.highlight && r.aiSelectionMode === 'phrase' && r.note.trim() && [...r.note].length <= 80));
+  const safety = nouns.find(r => r.anchor.exact === '心理安全感'), mark = page.locator(`[data-moji-mark~="${safety.id}"]`).first(); await mark.waitFor();
+  assert.equal(await mark.textContent(), '心理安全感');
+  assert.ok(await mark.evaluate(el => getComputedStyle(el).textDecorationLine.includes('underline') && getComputedStyle(el).backgroundColor !== 'rgba(0, 0, 0, 0)'));
+  await page.screenshot({ path: 'artifacts/ai-noun-underlines.png', fullPage: true });
+  await page.evaluate(values => { document.documentElement.classList.remove('translated-ltr'); values.forEach((s, i) => { document.querySelector('#p' + i).textContent = s; }); }, factors);
+  await page.waitForFunction(ids => ids.every(id => !document.querySelector(`[data-moji-mark~="${id}"]`)), nouns.map(r => r.id));
+  await page.locator('#task-undo').click(); await page.locator('#task-caption').filter({ hasText: '已撤销' }).waitFor();
+  assert.equal((await rpc('list')).records.find(r => r.id === 'manual-noun').deleted, false);
+  console.log('PASS: noun tasks mark exact terms with AI underlines and <=80-character reasons, coexist with manual highlights, never expand across languages, and undo leaves manual notes intact');
   // Actual runtime reload invalidates the old content script, just like an extension update.
   await rpc('mutate', { id: 'manual-recovery', baseRevision: 0, opId: crypto.randomUUID(), patch: { pageKey: page.url(), title: 'Test', anchor: { exact: factors[0], prefix: '', suffix: '', start: 0, end: factors[0].length }, originalQuote: factors[0], color: 'yellow', label: '', note: '之前已保存的笔记', styles: { highlight: true, underline: false, bold: false }, deleted: false } });
   await page.locator('#retry').click(); await page.locator('[data-record-id="manual-recovery"] .actions button').filter({ hasText: '编辑', exact: true }).click();

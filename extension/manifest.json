@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "墨迹 · 论文阅读标注",
-  "version": "1.10.1",
+  "version": "1.11.0",
   "description": "高亮、下划线、加粗与笔记；本地保存、版本记录、备份和重新定位。",
   "minimum_chrome_version": "120",
   "icons": {
@@ -41,6 +41,7 @@
       "js": [
         "palette.js",
         "positioning.js",
+        "annotation-rules.js",
         "ai-anchors.js",
         "article.js",
         "runtime-errors.js",

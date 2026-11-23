@@ -7,12 +7,13 @@ import { z } from 'zod';
 import { BridgeClient } from './client.mjs';
 import { defaultConfigPath } from './config.mjs';
 import Article from '../extension/article.js';
+import Rules from '../extension/annotation-rules.js';
 import Anchor from '../extension/anchor.js';
 import { readingPolicy } from './reading-policy.mjs';
 
 export function createMcpServer(client) {
   const handles = new Map();
-  const server = new McpServer({ name: 'moji-reader', version: '1.10.1' }, { instructions: readingPolicy });
+  const server = new McpServer({ name: 'moji-reader', version: '1.11.0' }, { instructions: readingPolicy });
   function remember(articleId, handle) {
     handles.set(articleId, handle);
     while (handles.size > 24 || [...handles.values()].reduce((n, h) => n + (h.document?.text.length || 0), 0) > 6000000) handles.delete(handles.keys().next().value);
@@ -54,17 +55,18 @@ export function createMcpServer(client) {
     if (args.offset > document.text.length) throw new Error('offset 超出文章长度。');
     return { articleId, title: document.title, url: document.url, sourceHash: document.sourceHash, textLength: document.text.length, offset: args.offset, nextOffset: end < document.text.length ? end : null, text: document.text.slice(args.offset, end), colors: document.colors, existingAnnotationCount: document.existingAnnotationCount };
   });
-  register('moji_highlight_passages', '优先用selections批量提交已读paragraphId和sentenceNumbers，免抄原文；省略句子编号选整段。标签与短批注用中文。passages保留旧摘录入口，两者只能用一种。返回可整批撤销的batchId。', {
-    articleId: z.string(), batchLabel: z.string().min(1).max(200).default('Codex 自动标注'), task: z.string().max(10000).default(''), dryRun: z.boolean().default(false),
-    selections: z.array(z.object({ paragraphId: z.string().regex(/^p[1-9]\d*$/), sentenceNumbers: z.array(z.number().int().positive()).min(1).max(500).optional(), color: z.enum(['yellow', 'blue', 'green', 'rose', 'purple']).default('yellow'), label: z.string().max(200).default('Codex 自动标注'), note: z.string().max(10000).default('') })).min(1).max(200).optional(),
-    passages: z.array(z.object({ quote: z.string().min(1).max(20000), color: z.enum(['yellow', 'blue', 'green', 'rose', 'purple']).default('yellow'), label: z.string().max(200).default('Codex 自动标注'), note: z.string().max(10000).default(''), prefix: z.string().max(1000).optional(), suffix: z.string().max(1000).optional(), start: z.number().int().min(0).optional() })).min(1).max(200).optional()
+  register('moji_highlight_passages', '默认AI下划线。每条必须有1–80字理由批注。名词任务用paragraphId+phrase精确选择，勿用整句；原始要求填写task用于校验，选择模式可设phrase。passages保留旧摘录入口，两者只能用一种。返回可整批撤销的batchId。', {
+    articleId: z.string(), batchLabel: z.string().min(1).max(200).default('Codex 自动标注'), task: z.string().max(10000).default('').describe('用户本次原始要求，名词和首次出现限制据此校验。'), selectionMode: z.enum(['auto', 'phrase']).default('auto'), dryRun: z.boolean().default(false),
+    selections: z.array(z.object({ paragraphId: z.string().regex(/^p[1-9]\d*$/), phrase: z.string().max(120).optional(), occurrence: z.number().int().positive().optional(), sentenceNumbers: z.array(z.number().int().positive()).min(1).max(500).optional(), color: z.enum(['yellow', 'blue', 'green', 'rose', 'purple']).default('yellow'), label: z.string().max(200).default('Codex 自动标注'), note: z.string().max(160).default('').describe('必须说明选择理由和原文依据，1–80字。') })).min(1).max(200).optional(),
+    passages: z.array(z.object({ quote: z.string().min(1).max(20000), color: z.enum(['yellow', 'blue', 'green', 'rose', 'purple']).default('yellow'), label: z.string().max(200).default('Codex 自动标注'), note: z.string().max(160).default('').describe('必须说明选择理由和原文依据，1–80字。'), prefix: z.string().max(1000).optional(), suffix: z.string().max(1000).optional(), start: z.number().int().min(0).optional() })).min(1).max(200).optional()
   }, async args => {
     const handle = handles.get(args.articleId); if (!handle) throw new Error('请先通过 moji_read_article 读取当前文章。');
     if (!!args.selections === !!args.passages) throw new Error('请选择 selections 或 passages 中的一种提交方式。');
-    const target = { tabId: handle.tabId, url: handle.url, sourceHash: handle.sourceHash };
+    const selectionRules = { selectionMode: Rules.mode(args.task, args.selectionMode), firstOnly: Rules.firstOnly(args.task), requireNote: true };
+    const target = { tabId: handle.tabId, url: handle.url, sourceHash: handle.sourceHash, selectionRules };
     if (!args.selections) return client.request('batch.apply', { ...target, batchId: crypto.randomUUID(), label: args.batchLabel, task: args.task, passages: args.passages, dryRun: args.dryRun });
     if (!handle.structured) throw new Error('编号标注需要先查看章节目录，再读取正文。');
-    const resolved = Article.resolve(handle.document.structure, args.selections);
+    const resolved = Article.resolve(handle.document.structure, args.selections, selectionRules);
     const passages = resolved.passages.filter(p => {
       if (handle.readIds.has(args.selections[p.index].paragraphId)) return true;
       resolved.rejected.push({ index: p.index, reason: '该段落尚未读取，请先阅读再标注。' }); return false;

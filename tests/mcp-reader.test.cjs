@@ -46,7 +46,7 @@ test('numbered submission resolves exact sentence locally and only sends target 
 test('unread and nonexistent paragraph IDs reject individually without writing and preserve original input indexes', async t => {
   const { tool, calls } = await setup(t), outline = await tool('moji_article_outline');
   const page = await tool('moji_read_article', { articleId: outline.articleId, sectionIds: [outline.sections[0].id] });
-  const result = await tool('moji_highlight_passages', { articleId: outline.articleId, selections: [{ paragraphId: 'p2' }, { paragraphId: page.paragraphs[0].id, sentenceNumbers: [1] }, { paragraphId: 'p999' }] });
+  const result = await tool('moji_highlight_passages', { articleId: outline.articleId, selections: [{ paragraphId: 'p2' }, { paragraphId: page.paragraphs[0].id, sentenceNumbers: [1], note: '原文说明心理安全感促进创意。' }, { paragraphId: 'p999' }] });
   assert.equal(result.createdCount, 1); assert.equal(result.rejectedCount, 2);
   assert.deepEqual(calls.find(c => c.method === 'batch.apply').args.selectionIndices, [1]);
   const before = calls.length;
@@ -66,4 +66,11 @@ test('chapter reads reuse one local snapshot instead of fetching and exposing th
   await tool('moji_read_article', { articleId: outline.articleId, sectionIds: [outline.sections[0].id] });
   await tool('moji_read_article', { articleId: outline.articleId, sectionIds: [outline.sections[1].id] });
   assert.equal(calls.filter(c => c.method === 'article.read').length, 1);
+});
+test('MCP noun requests reject full-sentence fallbacks and emit a short original phrase with an explanation', async t => {
+  const { tool, calls } = await setup(t), outline = await tool('moji_article_outline');
+  const page = await tool('moji_read_article', { articleId: outline.articleId });
+  const result = await tool('moji_highlight_passages', { articleId: outline.articleId, task: '只标因素名词，首次出现一次', selections: [{ paragraphId: page.paragraphs[0].id, sentenceNumbers: [1], note: '测试理由。' }, { paragraphId: page.paragraphs[0].id, phrase: 'psychological safety', note: '文中认为心理安全感促进创意，因此选择该因素。' }] });
+  assert.equal(result.createdCount, 1); assert.equal(result.rejectedCount, 1);
+  const call = calls.find(c => c.method === 'batch.apply'); assert.equal(call.args.passages[0].quote, 'psychological safety'); assert.equal(call.args.selectionRules.selectionMode, 'phrase');
 });

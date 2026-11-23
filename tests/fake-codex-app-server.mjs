@@ -9,7 +9,8 @@ async function run(prompt) {
   const page = JSON.parse(result.contentItems[0].text), selected = page.paragraphs.slice(-2);
   for (const [i, p] of selected.entries()) {
     if (interrupted) return;
-    await call('moji_highlight_passages', { selections: [{ paragraphId: p.id, sentenceNumbers: [1], color: i ? 'rose' : 'green', label: '团队因素', note: '直接证据：影响团队创意产出。' }] });
+    const phrase = prompt.includes('名词') ? (p.sentences[0].includes('心理安全感') ? '心理安全感' : p.sentences[0].includes('时间压力') ? '过高的时间压力' : p.sentences[0].includes('Psychological') ? 'Psychological safety' : 'High time pressure') : undefined;
+    await call('moji_highlight_passages', { selections: [{ paragraphId: p.id, sentenceNumbers: [1], ...(phrase ? { phrase } : {}), color: i ? 'rose' : 'green', label: '团队因素', note: '直接证据：影响团队创意产出。' }] });
     if (prompt.includes('部分停止')) return;
   }
   send({ method: 'item/completed', params: { item: { type: 'agentMessage', text: '已读正文并完成标注。' } } });

@@ -2,6 +2,7 @@
   'use strict';
   const PREFIX = 'moji:';
   const Palette = root.MojiPalette || (typeof require === 'function' ? require('./palette.js') : null);
+  const Rules = root.MojiAnnotationRules || (typeof require === 'function' ? require('./annotation-rules.js') : null);
   const COLORS = ['yellow', 'blue', 'green', 'rose', 'purple'];
   const clone = value => JSON.parse(JSON.stringify(value));
   // Chrome storage does not promise object property order. Compare canonical data,
@@ -102,12 +103,14 @@
           return { ...data[batchKey], replayed: true };
         }
         const now = Date.now(), writes = {}, recordIds = [], skipped = [];
-        const existing = [...records.values()].filter(r => r.pageKey === pageKey && !r.deleted && r.styles.highlight);
+        const existing = [...records.values()].filter(r => r.pageKey === pageKey && !r.deleted && r.aiSource === 'codex');
         for (const item of items) {
+          const error = Rules.noteError(item.note); if (error) throw new Error(error);
+          if (item.selectionMode === 'phrase') { const error = Rules.phraseError(item.anchor?.exact); if (error) throw new Error(error); }
           const duplicate = existing.find(r => r.anchor.start === item.anchor.start && r.anchor.end === item.anchor.end && r.anchor.exact === item.anchor.exact);
-          if (duplicate) { skipped.push({ index: item.index, recordId: duplicate.id, reason: '该原文位置已有高亮，未覆盖原有标签或笔记。' }); continue; }
+          if (duplicate) { skipped.push({ index: item.index, recordId: duplicate.id, reason: '该位置已有 AI 标注，未覆盖原有批注。' }); continue; }
           const id = crypto.randomUUID();
-          const record = validateRecord({ id, pageKey, title, anchor: clone(item.anchor), ...(item.bilingual ? { bilingual: clone(item.bilingual) } : {}), ...(taskId ? { aiTaskId: taskId } : {}), originalQuote: item.anchor.exact, color: item.color, label: item.label, note: item.note, styles: { highlight: true, underline: false, bold: false }, deleted: false, revision: 1, createdAt: now, updatedAt: now, aiBatchId: batchId, aiBatchLabel: label, aiTask: task, aiSource: 'codex' });
+          const record = validateRecord({ id, pageKey, title, anchor: clone(item.anchor), ...(item.bilingual ? { bilingual: clone(item.bilingual) } : {}), ...(taskId ? { aiTaskId: taskId } : {}), originalQuote: item.anchor.exact, color: item.color, label: item.label, note: item.note, styles: { highlight: false, underline: true, bold: false }, deleted: false, revision: 1, createdAt: now, updatedAt: now, aiBatchId: batchId, aiBatchLabel: label, aiTask: task, aiSource: 'codex', aiSelectionMode: item.selectionMode || 'sentence' });
           const eventId = crypto.randomUUID();
           writes[PREFIX + 'record:' + id] = record;
           writes[PREFIX + 'event:' + eventId] = { id: eventId, kind: 'ai-create', recordId: id, at: now, batchId, record };

@@ -1,6 +1,7 @@
 /* Local extraction and numbered references. Coordinates always refer to the full anchor index. */
 (function (root) {
   'use strict';
+  const Rules = root.MojiAnnotationRules || (typeof require === 'function' ? require('./annotation-rules.js') : null);
   const BLOCK = /^(P|LI|H[1-6]|BLOCKQUOTE|FIGCAPTION|TD|TH|PRE|DIV|SECTION|ARTICLE|MAIN)$/;
   const NOISE = /(?:^|[\s_-])(?:cookie|consent|advertisement|advert|ads|social|share|sharing|breadcrumb|toolbar|navigation|related-articles|recommendations|newsletter)(?:$|[\s_-])/i;
   function excluded(el, container) {
@@ -92,20 +93,37 @@
     }
     return { sectionIds: wanted, paragraphOffset: offset, nextParagraphOffset: cursor < candidates.length ? cursor : null, totalParagraphs: candidates.length, paragraphs };
   }
-  function resolve(structure, selections) {
+  function resolve(structure, selections, { selectionMode = 'sentence', firstOnly = false, requireNote = false } = {}) {
     if (!Array.isArray(selections) || !selections.length || selections.length > 200) throw new Error('每批需要 1–200 条编号选择。');
     const passages = [], rejected = [];
     for (const [index, selection] of selections.entries()) {
       try {
         const p = structure.paragraphs.find(p => p.id === selection.paragraphId);
         if (!p) throw new Error('段落编号不存在。');
+        if (requireNote) { const error = Rules.noteError(selection.note); if (error) throw new Error(error); }
+        if (selectionMode === 'phrase' && !selection.phrase) throw new Error('名词模式必须提供原文 phrase，不能省略为整段。');
         let start = p.start, end = p.end;
         if (selection.sentenceNumbers !== undefined) {
           const nums = selection.sentenceNumbers;
           if (!Array.isArray(nums) || !nums.length || nums.some((n, i) => !Number.isInteger(n) || n < 1 || n > p.sentences.length || (i && n !== nums[i - 1] + 1))) throw new Error('句子编号需按顺序连续选择；不连续的句子请分成不同标注。');
           start += p.sentences[nums[0] - 1].start; end = p.start + p.sentences[nums.at(-1) - 1].end;
         }
-        passages.push({ index, quote: p.text.slice(start - p.start, end - p.start), start, color: selection.color, label: selection.label, note: selection.note });
+        if (selection.phrase !== undefined) {
+          if (typeof selection.phrase !== 'string') throw new Error('phrase 必须是原文短语。');
+          const phrase = selection.phrase.normalize('NFKC').replace(/\s+/gu, ' ').trim(), error = Rules.phraseError(phrase);
+          if (error) throw new Error(error);
+          const occurrences = Rules.occurrences(p.text.slice(start - p.start, end - p.start), phrase);
+          if (!occurrences.length) throw new Error('所选范围没有该短语；不会扩大到整句。');
+          const nth = selection.occurrence;
+          if (nth !== undefined && (!Number.isInteger(nth) || nth < 1 || nth > occurrences.length)) throw new Error('短语 occurrence 无效（从1开始）。');
+          if (nth === undefined && occurrences.length > 1) throw new Error('短语出现多次，请提供句子编号或 occurrence。');
+          start += occurrences[(nth || 1) - 1]; end = start + phrase.length;
+          if (firstOnly) {
+            const earlier = structure.paragraphs.find(part => { const offsets = Rules.occurrences(part.text, phrase); return offsets.length && part.start + offsets[0] < start; });
+            if (earlier) throw new Error(`该短语在 ${earlier.id} 更早出现，请读取并标注首次位置。`);
+          }
+        }
+        passages.push({ index, quote: p.text.slice(start - p.start, end - p.start), start, color: selection.color, label: selection.label, note: selection.note, selectionMode: selection.phrase !== undefined ? 'phrase' : selectionMode });
       } catch (error) { rejected.push({ index, paragraphId: selection?.paragraphId, reason: error.message }); }
     }
     return { passages, rejected };

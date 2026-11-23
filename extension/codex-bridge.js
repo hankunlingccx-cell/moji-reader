@@ -44,7 +44,7 @@
       if (!Number.isInteger(args.tabId) || !/^[a-f0-9]{64}$/.test(args.sourceHash || '') || typeof args.url !== 'string') throw new Error('请先读取文章，获取有效的网页和正文版本。');
       const doc = await readArticle({ tabId: args.tabId, expectedUrl: args.url });
       if (doc.sourceHash !== args.sourceHash) throw new Error('正文已变化，未创建任何高亮；请重新读取文章后再操作。');
-      const prepared = await content(args.tabId, 'moji:prepareAiHighlights', { expectedText: doc.text, passages: args.passages, colors: Object.keys(doc.colors) });
+      const prepared = await content(args.tabId, 'moji:prepareAiHighlights', { expectedText: doc.text, passages: args.passages, selectionRules: args.selectionRules, colors: Object.keys(doc.colors) });
       if (args.selectionIndices) {
         if (!Array.isArray(args.selectionIndices) || args.selectionIndices.length !== args.passages.length || args.selectionIndices.some(n => !Number.isInteger(n) || n < 0 || n >= 200)) throw new Error('编号映射无效。');
         for (const item of [...prepared.items, ...prepared.rejected]) item.index = args.selectionIndices[item.index];

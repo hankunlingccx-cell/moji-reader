@@ -5,6 +5,13 @@ const A = require('../extension/anchor.js');
 const B = require('../extension/bilingual.js');
 const en = 'Psychological safety encourages team members to share unusual ideas and express disagreements.';
 const zh = '心理安全感鼓励团队成员分享不同寻常的想法并表达不同意见。';
+test('precise AI nouns never expand to a paragraph when switching languages, but manual precise bindings restore them', () => {
+  const { tracker, translate } = setup(), chineseIndex = translate(), anchor = capture(chineseIndex, '心理安全感'), bilingual = tracker.capture(chineseIndex, anchor);
+  const english = setup(), index = A.buildIndex(english.doc), record = { anchor, bilingual, aiSelectionMode: 'phrase' };
+  assert.equal(english.tracker.locate(index, record).status, 'unanchored');
+  record.bilingual = B.merge(bilingual, { variants: [{ language: 'en', scope: 'selection', anchor: capture(index, 'Psychological safety') }] });
+  const found = english.tracker.locate(index, record); assert.equal(found.scope, 'selection'); assert.equal(index.text.slice(found.start, found.end), 'Psychological safety');
+});
 function setup(body = `<p id="claim">${en}</p>`) {
   const doc = new JSDOM(`<html lang="en"><body>${body}</body></html>`, { url: 'https://example.org/paper' }).window.document;
   const tracker = B.create(doc); tracker.sync();
