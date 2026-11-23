@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "墨迹 · 论文阅读标注",
+  "version": "1.9.0",
+  "description": "高亮、下划线、加粗与笔记；本地保存、版本记录、备份和重新定位。",
+  "minimum_chrome_version": "120",
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "alarms"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "墨迹 · 打开标注侧栏",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png"
+    }
+  },
+  "options_page": "library.html",
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*", "file:///*"],
+      "js": ["anchor.js", "bilingual.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "file:///*"
+      ],
+      "js": [
+        "palette.js",
+        "positioning.js",
+        "ai-anchors.js",
+        "article.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0BbZi1/7a1b+JFDVAw4NF7W2ViolULICCImc4vExOdDkhJLfLGBy0iqq3u4yhmoX//3s5/f5MMA1DhN+u5kJPsBydS4aN6YNQ+ZirlN8FkeXGk17tnbocRIRs/UZU4q8UFgrFcgWFRR2PR1H3GjXnQCg6gfILatPMMZrc2R+QdUWFb/PBIyhDx2YzfvoUb/9SGLaIRpJBRRIiLuuiKhwz/BZEcDYxba8IlGgYSt0kNT6+a9H6JLefo/8Cr77NebXGHIGCC8I3blLsVGznspi9Vi2RK0Ox1Jr2TGq4lsbV0pTnJNzgZKB6EO6nCBjrbZgih/RfZHRiXyzdepVjv9OYwIDAQAB",
+  "host_permissions": [
+    "http://127.0.0.1/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' ws://127.0.0.1:*;"
+  }
+}
