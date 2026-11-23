@@ -57,13 +57,14 @@
     #color-hint{color:#8e8e93}#radial.ready #color-hint{color:#3a3a3c}#color-strip button.active .color-dot{box-shadow:0 0 0 2px #fff,0 0 0 3px #007aff}#color-strip button[aria-checked="true"]:after{background:#8e8e93}
     *{scrollbar-width:thin;scrollbar-color:#c7c7cc transparent}
     #context-warning{padding:9px;background:#fff5e7;border:1px solid #f1dcc0;border-radius:9px;margin-top:8px;font-size:11px;color:#805b25;line-height:1.7}#context-warning button{background:white;border:1px solid #e5d4ba;border-radius:6px;margin:5px 5px 0 0;padding:4px 7px;font-size:11px}
+    header{padding:14px 20px 12px}header h1{font-size:17px;font-weight:600;letter-spacing:0}.header-actions{display:flex;align-items:center;gap:2px}#page-source{display:flex;align-items:center;gap:5px;margin:7px 0 0;min-width:0;color:#636366;text-decoration:none}#page-source:hover{color:#007aff}#page-title{margin:0;min-width:0;font-size:12px;color:inherit}#page-source svg{width:13px;height:13px;flex-shrink:0}#status{min-height:0;margin-top:6px;font-size:11px;color:#636366}footer{padding:7px 20px;justify-content:flex-end}footer #library{min-height:28px}.actions{flex-wrap:wrap;column-gap:6px}#draft-state:empty{display:none}.field-row{display:flex;align-items:center;gap:3px;margin:13px 0 5px}.field-row>label.field{margin:0}
   </style>
   <button id="launcher" title="打开墨迹标注侧栏"><span class="logo">墨</span><span>阅读标注</span><span id="launcher-count" class="muted">0</span></button>
   <section id="drawer" hidden aria-label="墨迹阅读标注侧栏">
-    <header><div class="row between"><div class="row"><span class="logo">墨</span><div><div class="eyebrow">PAPER NOTES</div><h1>阅读的痕迹</h1></div></div><button id="close" class="icon" title="关闭侧栏">×</button></div><div id="page-title"></div><a id="page-source" target="_blank" rel="noopener noreferrer">查看原文 ↗</a><div id="status" role="status" aria-live="polite">正在读取本地标注…</div><div id="context-warning" hidden>扩展已更新。未保存的输入仍保留在面板中，请先下载输入副本再刷新。<div><button id="context-download" type="button">下载输入副本</button><button id="context-refresh" type="button">刷新此页</button></div></div></header>
+    <header><div class="row between"><h1>标注</h1><div class="header-actions"><span data-info="标注保存在此浏览器。卸载扩展、删除配置或重装可能丢失数据；请在标注库导出备份。" aria-label="数据与备份说明"></span><button id="close" class="icon" title="关闭侧栏" aria-label="关闭标注侧栏">×</button></div></div><a id="page-source" target="_blank" rel="noopener noreferrer"><span id="page-title"></span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M5 3H3v10h10v-2M8 3h5v5M7 9l6-6"/></svg></a><div id="status" role="status" aria-live="polite">正在读取本地标注…</div><div id="context-warning" role="alert" hidden>扩展已更新。未保存的输入仍保留在面板中，请先下载输入副本再刷新。<div><button id="context-download" type="button">下载输入副本</button><button id="context-refresh" type="button">刷新此页</button></div></div></header>
     <details id="codex-task-panel"></details>
     <div id="tools" class="tools"><button id="undo" class="quiet" title="撤销上次标注修改">↶ 撤销</button><button id="redo" class="quiet">↷ 重做</button><button id="hide" class="quiet">隐藏标记</button><button id="retry" class="quiet">重新匹配</button><select id="filter" class="filter" aria-label="筛选标注"><option value="all">全部标注</option><option value="unanchored">待重新定位</option><option value="notes">含笔记</option><option value="drafts">有草稿</option><option value="deleted">回收站</option><option value="yellow">黄色 · 重要结论</option><option value="blue">蓝色 · 研究方法</option><option value="green">绿色 · 值得借鉴</option><option value="rose">红色 · 疑问待查</option><option value="purple">紫色 · 其他想法</option></select><input id="search" class="search" placeholder="搜索原文、标签或笔记…" aria-label="搜索当前论文标注"></div>
-    <div id="list"></div><div id="editor" hidden></div><footer><span>仅保存在此浏览器 · 请定期备份</span><button id="library">标注库与备份 ↗</button></footer>
+    <div id="list"></div><div id="editor" hidden></div><footer><button id="library">标注库与备份 ↗</button></footer>
   </section>
   <div id="toolbar" hidden role="toolbar" aria-label="文字标注"><div id="selection-colors" aria-label="选择高亮颜色与含义"></div><span class="sep"></span><button data-add="underline"><u>下划线</u></button><button data-add="bold"><b>加粗</b></button><button data-add="note">笔记 / 标签</button><button id="palette-settings-button" title="自定义颜色与含义" aria-label="自定义颜色与含义">⚙</button><button id="relink-selection" hidden>将原记录定位到此处</button></div>
   <div id="mark-panel" hidden role="toolbar" aria-label="编辑已有标注"><button class="action-icon" data-format="underline" title="下划线" aria-label="下划线">${iconSvg('underline')}</button><button class="action-icon" data-format="highlight" title="高亮" aria-label="高亮">${iconSvg('highlight')}</button><button class="action-icon" data-format="bold" title="加粗" aria-label="加粗">${iconSvg('bold')}</button><span class="divider"></span><button class="action-icon" id="panel-note" title="记录笔记" aria-label="记录笔记">${iconSvg('note')}</button><button class="action-icon danger-icon" id="panel-delete" title="删除标注（可在回收站恢复）" aria-label="删除标注">${iconSvg('delete')}</button><button class="dismiss" id="panel-close" title="关闭标注面板" aria-label="关闭标注面板">×</button></div>
@@ -96,7 +97,7 @@
   function fail(error) { const info = MojiRuntimeErrors.describe(error); if (info.invalidated) invalidateContext(); if (!contextInvalid) { status(info.message, true); toast(info.message, true); } }
   function invalidateContext() {
     if (contextInvalid) return; contextInvalid = true; observer.disconnect(); clearTimeout(refreshTimer); taskPanel?.invalidate();
-    $('context-warning').hidden = false; status('墨迹已更新，请保留未保存输入后刷新此页。', true);
+    $('context-warning').hidden = false; $('status').hidden = true;
     for (const b of ui.querySelectorAll('button')) if (!['context-download', 'context-refresh', 'close', 'launcher'].includes(b.id)) b.disabled = true;
   }
   function downloadRecovery() {
@@ -110,7 +111,7 @@
   function updateStatus() {
     if (contextInvalid) return;
     const live = records.filter(r => !r.deleted), missing = live.filter(r => attached.get(r.id)?.status === 'unanchored').length;
-    status(`已保存到本地 · ${live.length} 条标注${missing ? ` · ${missing} 条待重新定位` : ''}`);
+    status(`${live.length} 条标注${missing ? ` · ${missing} 待定位` : ''}`);
     $('launcher-count').textContent = String(live.length); $('undo').disabled = !undo.length || busy; $('redo').disabled = !redo.length || busy;
   }
   const observer = new MutationObserver(mutations => {
@@ -177,6 +178,7 @@
   function renderList() {
     $('page-title').textContent = document.title; const list = $('list'); list.replaceChildren();
     $('page-source').href = page; $('page-source').title = page;
+    $('page-source').setAttribute('aria-label', '打开原文：' + document.title);
     const needle = search.toLocaleLowerCase();
     const shown = records.filter(r => {
       if (filter === 'deleted' ? !r.deleted : r.deleted) return false;
@@ -197,17 +199,18 @@
       if (!r.deleted && found?.status === 'unanchored') top.append(text('span', '待重新定位', 'badge'));
       if (found?.status === 'adjusted') top.append(text('span', '原文有小幅修改', 'badge'));
       if (found?.scope === 'paragraph') top.append(text('span', '跨语言段落定位', 'badge'));
-      else if (r.bilingual?.variants?.length) top.append(text('span', '双语定位', 'badge'));
       if (/\btranslated-(?:ltr|rtl)\b/.test(document.documentElement.className) && MojiBilingual.language(r.anchor.exact) === 'zh' && !r.bilingual?.variants?.some(v => v.language === 'en')) {
         const hint = text('span', '尚未绑定英文', 'badge'); hint.title = '可显示一次原文以尝试建立对应，或点击“绑定另一语言”手动选择英文。'; top.append(hint);
       }
       if (drafts[r.id]) top.append(text('span', '有草稿', 'badge'));
-      if (r.aiBatchId) top.append(text('span', 'Codex', 'badge'));
       const quote = btn(r.anchor.exact, () => jump(r.id), 'quote'); card.append(top, quote);
       if (r.label) card.append(text('span', r.label, 'label'));
       if (r.note) card.append(text('div', r.note, 'note'));
       const actions = text('div', '', 'actions');
-      if (!r.deleted) actions.append(btn('编辑', () => edit(r.id)), btn('重新定位', () => beginRelink(r.id)), btn('绑定另一语言', () => beginRelink(r.id, true)), btn('删除', () => change(r.id, { deleted: true }, 'delete'), 'danger'));
+      if (!r.deleted) {
+        const remove = btn('删除', () => change(r.id, { deleted: true }, 'delete'), 'danger'); remove.title = '移入回收站，笔记和历史保留'; remove.setAttribute('aria-description', remove.title);
+        actions.append(btn('编辑', () => edit(r.id)), btn('重新定位', () => beginRelink(r.id)), btn('绑定另一语言', () => beginRelink(r.id, true)), remove);
+      }
       else actions.append(btn('恢复记录', () => change(r.id, { deleted: false }, 'restore')));
       actions.append(btn('版本', () => showHistory(r.id))); card.append(actions); list.append(card);
     }
@@ -307,11 +310,12 @@
     const target = editor;
     const saved = drafts[id], useDraft = saved && (saved.note !== r.note || saved.label !== r.label);
     $('editor').replaceChildren(); $('editor').hidden = false; $('tools').hidden = true; $('list').hidden = true;
-    const pane = $('editor'); pane.append(text('h2', '阅读笔记'), text('blockquote', r.anchor.exact));
+    const pane = $('editor'); pane.append(text('h2', '编辑标注'), text('blockquote', r.anchor.exact));
     for (const v of r.bilingual?.variants || []) if (v.anchor.exact !== r.anchor.exact) pane.append(text('div', `${v.language === 'en' ? '英文原文' : '中文译文'} · ${v.scope === 'paragraph' ? '对应段落（非逐词对齐）' : '精确摘录'}`, 'muted'), text('blockquote', v.anchor.exact));
-    const label = text('label', '悬停标签', 'field'); label.htmlFor = 'note-label'; const labelInput = document.createElement('input'); labelInput.id = 'note-label'; labelInput.maxLength = 200; labelInput.placeholder = '例如：可用于我的实验设计'; labelInput.value = useDraft ? saved.label : r.label;
-    const noteLabel = text('label', '阅读笔记', 'field'); noteLabel.htmlFor = 'note-body'; const noteInput = document.createElement('textarea'); noteInput.id = 'note-body'; noteInput.maxLength = 100000; noteInput.placeholder = '记下你的理解、疑问或下一步…'; noteInput.value = useDraft ? saved.note : r.note;
-    const draftState = text('div', useDraft ? '已找回保留的草稿，继续编辑即自动保存。' : '笔记与标签自动保存，无需手动提交。'); draftState.id = 'draft-state'; draftState.setAttribute('role', 'status');
+    const label = text('label', '标签', 'field'); label.htmlFor = 'note-label'; const labelInput = document.createElement('input'); labelInput.id = 'note-label'; labelInput.maxLength = 200; labelInput.value = useDraft ? saved.label : r.label;
+    const noteLabel = text('label', '笔记', 'field'); noteLabel.htmlFor = 'note-body'; const noteInput = document.createElement('textarea'); noteInput.id = 'note-body'; noteInput.maxLength = 100000; noteInput.value = useDraft ? saved.note : r.note;
+    const draftState = text('div', useDraft ? '已载入草稿' : ''); draftState.id = 'draft-state'; draftState.setAttribute('role', 'status');
+    const noteHeading = text('div', '', 'field-row'); noteHeading.append(noteLabel, MojiInfo.create(document, '笔记保存说明', '输入后自动保存。发生版本冲突时，输入保留为独立草稿。'));
     function noteChanged() {
       const sequence = ++target.sequence, value = { label: labelInput.value, note: noteInput.value };
       unsavedInputs.set(id, { recordId: id, draftId: target.draftId, sequence, ...value });
@@ -334,7 +338,7 @@
     labelInput.addEventListener('input', noteChanged); noteInput.addEventListener('input', noteChanged);
     const controls = text('div', '', 'row'); controls.style.marginTop = '18px';
     controls.append(btn('完成', () => { closeEditor(); renderList(); }, 'secondary'));
-    pane.append(label, labelInput, noteLabel, noteInput, draftState, text('div', '输入即保存，关闭面板也会继续保存。悬停标记可查看笔记。', 'help'), controls);
+    pane.append(label, labelInput, noteHeading, noteInput, draftState, controls);
     noteInput.focus();
   }
   function closeEditor() { editor = null; $('editor').hidden = true; $('tools').hidden = false; $('list').hidden = false; }
@@ -503,6 +507,7 @@
   window.addEventListener('scroll', () => { $('toolbar').hidden = true; $('mark-panel').hidden = true; $('tooltip').hidden = true; }, { passive: true });
   window.addEventListener('pagehide', () => { stopped = true; observer.disconnect(); });
   window.addEventListener('pageshow', () => { stopped = false; refresh().catch(fail); });
+  MojiInfo.install(ui);
   taskPanel = MojiTaskPanel.mount({ ui, rpc, uid, isInvalid: () => contextInvalid });
   $('context-download').addEventListener('click', downloadRecovery);
   $('context-refresh').addEventListener('click', () => { if (unsavedInputs.size || taskPanel.prompt().trim()) downloadRecovery(); location.reload(); });

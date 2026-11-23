@@ -46,7 +46,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       case 'moji:exported': await chrome.storage.local.set({ 'moji:lastExportAt': Date.now() }); return true;
       case 'moji:import': return repo.importData(message.backup);
       case 'moji:library':
-        if (message.palette) await chrome.tabs.create({ url: chrome.runtime.getURL('library.html#palette') });
+        if (message.palette || message.codex) await chrome.tabs.create({ url: chrome.runtime.getURL('library.html' + (message.codex ? '#codex' : '#palette')) });
         else await chrome.runtime.openOptionsPage();
         return true;
       default: throw new Error('未知操作。');

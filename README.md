@@ -42,7 +42,7 @@ Local-first Chrome annotations with bilingual recovery, Markdown export, and Cod
 
 需要 **Chrome 120 或更新版本**。目前提供开发者模式安装包，未上架 Chrome 应用商店。
 
-1. 从 [Releases](../../releases/latest) 下载 `moji-reader-v1.10.0.zip`，解压到准备长期保留的目录；也可下载仓库源码。
+1. 从 [Releases](../../releases/latest) 下载 `moji-reader-v1.10.1.zip`，解压到准备长期保留的目录；也可下载仓库源码。
 2. 在 Chrome 地址栏打开 `chrome://extensions`，启用右上角「开发者模式」。
 3. 点击「加载已解压的扩展程序」，选择解压后的 **`extension` 文件夹**，其中应有 `manifest.json`。
 4. 刷新已打开的论文网页，选中文字开始标注；点击右下角入口或扩展图标打开侧栏。
@@ -87,7 +87,7 @@ Local-first Chrome annotations with bilingual recovery, Markdown export, and Cod
 
 需要 Node.js 20+、npm，以及支持本地 MCP 服务的桌面 Codex。**墨迹不要求填写模型 API Key**；Codex 的账户、额度及使用规则由你的 Codex 环境决定。
 
-下载完整的 `moji-codex-v1.10.0.zip` 并解压，或使用仓库源码。在项目根目录运行：
+下载完整的 `moji-codex-v1.10.1.zip` 并解压，或使用仓库源码。在项目根目录运行：
 
 ```powershell
 npm ci --omit=dev

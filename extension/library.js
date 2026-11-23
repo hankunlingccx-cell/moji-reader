@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+  MojiInfo.install(document);
   const $ = id => document.getElementById(id);
   const make = (tag, value = '', className) => { const e = document.createElement(tag); e.textContent = value; if (className) e.className = className; return e; };
   const button = (value, fn, cls = 'small-button') => { const e = make('button', value, cls); e.addEventListener('click', fn); return e; };
@@ -14,7 +15,7 @@
     for (const key of MojiPalette.KEYS) $('color').querySelector(`option[value="${key}"]`).textContent = colors[key].name;
     if (!paletteDirty) renderPaletteForm();
     $('count').textContent = records.filter(r => !r.deleted).length; $('trash-count').textContent = records.filter(r => r.deleted).length; $('draft-count').textContent = draftList.length;
-    $('backup-state').textContent = data.lastExportAt ? `上次导出：${new Date(data.lastExportAt).toLocaleString()}` : '尚未导出过备份 · 建议现在备份';
+    $('backup-state').textContent = data.lastExportAt ? `上次备份：${new Date(data.lastExportAt).toLocaleString()}` : '尚无备份';
     if (renderSelected) { selectedId = null; dirty = false; }
     renderList();
   }
@@ -62,10 +63,10 @@
     }
     $('article-header').hidden = !selectedPage;
     if (!selectedPage) {
-      list.replaceChildren(make('div', '选择左侧网页，查看该网页的全部标注。', 'empty')); return;
+      list.replaceChildren(make('div', '选择网页', 'empty')); return;
     }
     $('article-title').textContent = items[0]?.title || new URL(selectedPage).hostname || '本地文档';
-    $('article-list-meta').textContent = `${items.length} 条${mode === 'trash' ? '已删除' : ''}标注${$('search').value || $('color').value !== 'all' ? ' · 当前筛选结果' : ' · 按原文顺序排列'}`;
+    $('article-list-meta').textContent = `${items.length} 条${mode === 'trash' ? '已删除' : ''}标注${$('search').value || $('color').value !== 'all' ? ' · 筛选结果' : ''}`;
     const sorted = [...items].sort((a, b) => a.anchor.start - b.anchor.start || a.createdAt - b.createdAt);
     const ids = new Set(sorted.map(r => r.id));
     if (selectedId && !ids.has(selectedId)) selectedId = null;
@@ -95,7 +96,7 @@
       card.querySelector('.record-date').textContent = new Date(r.updatedAt).toLocaleString();
       card.querySelector('.annotation-quote').textContent = r.anchor.exact;
       const label = card.querySelector('.annotation-label'); label.textContent = r.label; label.hidden = !r.label;
-      const note = card.querySelector('.annotation-note'); note.textContent = r.note || '尚无笔记'; note.classList.toggle('no-note', !r.note);
+      const note = card.querySelector('.annotation-note'); note.textContent = r.note || ''; note.hidden = !r.note; note.classList.toggle('no-note', !r.note);
       const badges = card.querySelector('.annotation-badges'); badges.replaceChildren();
       if (draftList.some(d => d.recordId === r.id)) badges.append(make('span', '有草稿', 'tag'));
       if (r.importedFrom) badges.append(make('span', '导入的冲突副本', 'tag'));
@@ -119,9 +120,10 @@
     const card = [...$('annotations').children].find(node => node.dataset.recordId === id); if (!card) return;
     const thisDraft = { id: crypto.randomUUID(), sequence: 0 };
     const detail = card.querySelector('.annotation-editor'); detail.hidden = false; detail.replaceChildren();
-    const label = make('label', '悬停标签', 'field'); label.htmlFor = 'edit-label'; const labelInput = make('input'); labelInput.id = 'edit-label'; labelInput.maxLength = 200; labelInput.value = r.label;
-    const noteLabel = make('label', '阅读笔记', 'field'); noteLabel.htmlFor = 'edit-note'; const note = make('textarea'); note.id = 'edit-note'; note.maxLength = 100000; note.value = r.note;
-    const state = make('div', '笔记与标签自动保存，无需手动提交。', 'draft-state'); state.setAttribute('role', 'status');
+    const label = make('label', '标签', 'field'); label.htmlFor = 'edit-label'; const labelInput = make('input'); labelInput.id = 'edit-label'; labelInput.maxLength = 200; labelInput.value = r.label;
+    const noteLabel = make('label', '笔记', 'field'); noteLabel.htmlFor = 'edit-note'; const note = make('textarea'); note.id = 'edit-note'; note.maxLength = 100000; note.value = r.note;
+    const noteHeading = make('div', '', 'field-row'); noteHeading.append(noteLabel, MojiInfo.create(document, '笔记保存说明', '输入后自动保存；版本冲突时输入保留为独立草稿。'));
+    const state = make('div', '', 'draft-state'); state.setAttribute('role', 'status');
     function draftChanged() {
       dirty = true; state.textContent = '正在自动保存…'; const value = { label: labelInput.value, note: note.value }, sequence = ++thisDraft.sequence;
       const write = rpc('autosave', { id, draftId: thisDraft.id, baseRevision: r.revision, sequence, ...value }).then(result => {
@@ -137,11 +139,11 @@
       draftChain = Promise.all([draftChain.catch(() => {}), write]).then(() => {}); draftChain.catch(() => {});
     }
     labelInput.addEventListener('input', draftChanged); note.addEventListener('input', draftChanged);
-    detail.append(label, labelInput, noteLabel, note, state);
+    detail.append(label, labelInput, noteHeading, note, state);
     const actions = make('div', '', 'detail-actions');
     actions.append(button(r.deleted ? '恢复记录' : '移入回收站', async () => { try { await draftChain; await mutate(r, { deleted: !r.deleted }, r.deleted ? 'restore' : 'delete'); dirty = false; await refresh(true); } catch (e) { fail(e); } }, 'secondary' + (r.deleted ? '' : ' danger')));
-    if (r.deleted) { labelInput.disabled = true; note.disabled = true; state.textContent = '恢复记录后即可编辑，笔记将自动保存。'; }
-    detail.append(actions, make('p', '需要重新定位时：打开原网页 → 侧栏找到此记录 → 重新定位 → 选择对应文字。', 'meta'));
+    if (r.deleted) { labelInput.disabled = true; note.disabled = true; state.textContent = '已在回收站'; }
+    detail.append(actions);
     for (const v of r.bilingual?.variants || []) if (v.anchor.exact !== r.anchor.exact) detail.append(make('h3', `${v.language === 'en' ? '英文原文' : '中文译文'} · ${v.scope === 'paragraph' ? '对应段落（非逐词对齐）' : '精确摘录'}`, 'subheading'), make('blockquote', v.anchor.exact, 'detail-quote'));
     if (r.originalQuote && r.originalQuote !== r.anchor.exact) { detail.append(make('h3', '最初标记的原文', 'subheading'), make('blockquote', r.originalQuote, 'detail-quote')); }
     const ownDrafts = draftList.filter(d => d.recordId === id).sort((a, b) => b.at - a.at);
@@ -149,7 +151,7 @@
       detail.append(make('h3', '保留的草稿', 'subheading'));
       for (const d of ownDrafts) {
         const box = make('div', '', 'draft-box'); box.append(make('div', `草稿 · ${new Date(d.at).toLocaleString()}`, 'meta'), make('div', d.label || '无标签', 'tag'), make('p', d.note || '无笔记'));
-        box.append(button('载入编辑区', () => { labelInput.value = d.label; note.value = d.note; draftChanged(); status('草稿已载入，原草稿仍保留。'); }), button('丢弃此草稿', async () => { try { await rpc('clearDraft', { draftId: d.draftId, expectedAt: d.at }); box.remove(); await refresh(false); } catch (e) { fail(e); } })); detail.append(box);
+        box.append(button('载入编辑区', () => { labelInput.value = d.label; note.value = d.note; draftChanged(); status('草稿已载入，原草稿仍保留。'); }), button('永久丢弃草稿', async () => { try { await rpc('clearDraft', { draftId: d.draftId, expectedAt: d.at }); box.remove(); await refresh(false); } catch (e) { fail(e); } })); detail.append(box);
       }
     }
     const historySection = make('details', '', 'annotation-history'), heading = make('summary', '历史版本'), history = make('div', '正在读取…', 'meta');
@@ -162,7 +164,7 @@
       }
     }).catch(fail);
   }
-  function setMode(next) { mode = next; $('heading').textContent = { all: '我的标注库', drafts: '笔记草稿', trash: '回收站' }[next]; for (const name of ['all', 'drafts', 'trash']) $('nav-' + name).classList.toggle('selected', name === next); renderList(); }
+  function setMode(next) { mode = next; $('heading').textContent = { all: '标注库', drafts: '笔记草稿', trash: '回收站' }[next]; for (const name of ['all', 'drafts', 'trash']) $('nav-' + name).classList.toggle('selected', name === next); renderList(); }
   function renderPaletteForm(value = palette) {
     paletteEditRevision = palette.revision; $('palette-rows').replaceChildren();
     MojiPalette.KEYS.forEach((key, index) => {

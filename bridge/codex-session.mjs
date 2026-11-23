@@ -24,7 +24,7 @@ export class CodexSession {
     this.child.stderr.on('data', () => {}); // No auth/config stderr is exposed to the webpage.
     this.lines = createInterface({ input: this.child.stdout });
     this.lines.on('line', line => { if (line.length > 4000000) return this.fail(new Error('Codex 返回内容过大。')); try { this.receive(JSON.parse(line)); } catch {} });
-    await this.request('initialize', { clientInfo: { name: 'moji_reader', title: 'Moji Reader', version: '1.10.0' }, capabilities: { experimentalApi: true } });
+    await this.request('initialize', { clientInfo: { name: 'moji_reader', title: 'Moji Reader', version: '1.10.1' }, capabilities: { experimentalApi: true } });
     this.send({ method: 'initialized', params: {} });
     const auth = await this.request('account/read', { refreshToken: false });
     if (!auth.account && auth.requiresOpenaiAuth) throw new Error('请先在本机运行 codex login，登录后重新开始任务。');

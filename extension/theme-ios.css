@@ -137,6 +137,8 @@ input::placeholder, textarea::placeholder { color: #9b9ba1; }
 #ai-summary { color: #48484a; font-weight: 550; }
 #ai-export-status { color: #8e8e93; }
 * { scrollbar-width: thin; scrollbar-color: #c7c7cc transparent; }
+/* Keep navigation and forms self-explanatory without repeated helper copy. */
+.brand{margin-bottom:24px}.aside-bottom{display:flex;align-items:center;justify-content:space-between}.backup-info{align-items:center;padding-top:8px;padding-bottom:8px}#palette-settings>summary,#codex-settings>summary{display:flex;align-items:center;gap:8px}#codex-summary{margin-left:auto}#codex-settings[open]>summary #codex-summary{display:none}.draft-state:empty,.annotation-note:empty{display:none}.field:has(.info-wrap){display:flex;align-items:center;gap:3px}.annotation-editor .info-wrap{vertical-align:middle}.ai-dialog-header{align-items:center}.ai-preview-label{margin-top:12px}
 @media(max-width:1000px) {
   aside { width: 180px; padding: 28px 16px; }
   main { margin-left: 180px; padding: 28px 24px 18px; }
@@ -160,3 +162,5 @@ input::placeholder, textarea::placeholder { color: #9b9ba1; }
 }
 @media(prefers-reduced-motion:reduce) { button, #palette-settings summary::before { transition: none; } }
 #codex-settings{margin:0 0 18px;border:1px solid var(--ios-line);border-radius:13px;background:#fff}#codex-settings summary{cursor:pointer;padding:12px 16px;color:#3a3a3c;font-size:12px;font-weight:550}#codex-summary{margin-left:12px;font-size:11px;font-weight:400;color:var(--ios-muted)}.codex-body{padding:0 20px 18px}.codex-body>p{font-size:12px;color:#8e8e93;line-height:1.8}.codex-controls{display:flex;align-items:center;gap:9px;flex-wrap:wrap}#codex-status{font-size:12px;color:#8e8e93}#codex-status.connected{color:#248a3d}.codex-body h3{font-size:12px;margin:20px 0 8px;color:#636366}.codex-batch{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 0;border-top:1px solid #ededf1}.codex-batch>div{min-width:0}.codex-batch strong{font-size:12px}.codex-batch p{margin:3px 0;overflow-wrap:anywhere}.codex-batch button{white-space:nowrap}#codex-operation-status{font-size:12px;color:#636366;margin-top:8px}
+
+.field-row{display:flex;align-items:center;gap:3px;margin:13px 0 5px}.field-row>.field{margin:0}

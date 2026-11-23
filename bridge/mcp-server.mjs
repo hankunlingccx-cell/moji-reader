@@ -12,7 +12,7 @@ import { readingPolicy } from './reading-policy.mjs';
 
 export function createMcpServer(client) {
   const handles = new Map();
-  const server = new McpServer({ name: 'moji-reader', version: '1.10.0' }, { instructions: readingPolicy });
+  const server = new McpServer({ name: 'moji-reader', version: '1.10.1' }, { instructions: readingPolicy });
   function remember(articleId, handle) {
     handles.set(articleId, handle);
     while (handles.size > 24 || [...handles.values()].reduce((n, h) => n + (h.document?.text.length || 0), 0) > 6000000) handles.delete(handles.keys().next().value);
