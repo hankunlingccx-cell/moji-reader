@@ -13,6 +13,16 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id !== chrome.runtime.id || !message?.type?.startsWith('moji:')) return;
   const run = async () => {
     switch (message.type) {
+      case 'moji:taskStart':
+      case 'moji:taskLatest':
+      case 'moji:taskStop':
+      case 'moji:taskUndo': {
+        if (!sender.tab?.id || !sender.url) throw new Error('请在论文正文侧栏使用阅读任务。');
+        const url = new URL(sender.url); url.hash = '';
+        for (const key of [...url.searchParams.keys()]) if (/^(utm_|fbclid$|gclid$)/i.test(key)) url.searchParams.delete(key); url.searchParams.sort();
+        const method = { 'moji:taskStart': 'task.start', 'moji:taskLatest': 'task.latest', 'moji:taskStop': 'task.stop', 'moji:taskUndo': 'task.undo' }[message.type];
+        return codexBridge.task(method, { id: message.id, prompt: message.prompt, url: url.href, tabId: sender.tab.id });
+      }
       case 'moji:bridgeStatus': return codexBridge.status();
       case 'moji:bridgeConfigure':
       case 'moji:bridgeReconnect':

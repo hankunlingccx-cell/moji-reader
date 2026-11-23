@@ -90,11 +90,13 @@
         return value;
       });
     }
-    async createAiBatch({ batchId, pageKey, title, label, task = '', items, rejected = [] }) {
+    async createAiBatch({ batchId, pageKey, title, label, task = '', taskId, items, rejected = [] }) {
       return this.serial(async () => {
         if (!/^[\w-]{1,80}$/.test(batchId || '') || typeof pageKey !== 'string' || !['http:', 'https:', 'file:'].includes(new URL(pageKey).protocol) || typeof title !== 'string' || title.length > 1000 || typeof label !== 'string' || !label.trim() || label.length > 200 || typeof task !== 'string' || task.length > 10000 || !Array.isArray(items) || items.length > 200 || !Array.isArray(rejected) || rejected.length > 200) throw new Error('批量标注参数无效。');
-        const signature = await root.MojiRepository.checksum({ pageKey, title, label, task, items, rejected });
+        if (taskId !== undefined && !/^[\w-]{1,80}$/.test(taskId)) throw new Error('阅读任务编号无效。');
+        const signature = await root.MojiRepository.checksum({ pageKey, title, label, task, items, rejected, ...(taskId ? { taskId } : {}) });
         const { data, records } = await this.all(), batchKey = PREFIX + 'batch:' + batchId;
+        if (taskId && data[PREFIX + 'taskBlocked:' + taskId]) throw new Error('此任务已停止或撤销，不再写入标注。');
         if (data[batchKey]) {
           if (data[batchKey].signature !== signature) throw new Error('该批次 ID 已用于另一组标注。');
           return { ...data[batchKey], replayed: true };
@@ -105,7 +107,7 @@
           const duplicate = existing.find(r => r.anchor.start === item.anchor.start && r.anchor.end === item.anchor.end && r.anchor.exact === item.anchor.exact);
           if (duplicate) { skipped.push({ index: item.index, recordId: duplicate.id, reason: '该原文位置已有高亮，未覆盖原有标签或笔记。' }); continue; }
           const id = crypto.randomUUID();
-          const record = validateRecord({ id, pageKey, title, anchor: clone(item.anchor), ...(item.bilingual ? { bilingual: clone(item.bilingual) } : {}), originalQuote: item.anchor.exact, color: item.color, label: item.label, note: item.note, styles: { highlight: true, underline: false, bold: false }, deleted: false, revision: 1, createdAt: now, updatedAt: now, aiBatchId: batchId, aiBatchLabel: label, aiTask: task, aiSource: 'codex' });
+          const record = validateRecord({ id, pageKey, title, anchor: clone(item.anchor), ...(item.bilingual ? { bilingual: clone(item.bilingual) } : {}), ...(taskId ? { aiTaskId: taskId } : {}), originalQuote: item.anchor.exact, color: item.color, label: item.label, note: item.note, styles: { highlight: true, underline: false, bold: false }, deleted: false, revision: 1, createdAt: now, updatedAt: now, aiBatchId: batchId, aiBatchLabel: label, aiTask: task, aiSource: 'codex' });
           const eventId = crypto.randomUUID();
           writes[PREFIX + 'record:' + id] = record;
           writes[PREFIX + 'event:' + eventId] = { id: eventId, kind: 'ai-create', recordId: id, at: now, batchId, record };
@@ -117,6 +119,31 @@
         const check = await this.storage.get(Object.keys(writes));
         for (const key of Object.keys(writes)) if (stable(check[key]) !== stable(writes[key])) throw new Error('批量保存校验失败；请用相同批次 ID 重试。');
         return clone(batch);
+      });
+    }
+    async blockAiTask(taskId) {
+      return this.serial(async () => {
+        if (!/^[\w-]{1,80}$/.test(taskId || '')) throw new Error('任务编号无效。');
+        const key = PREFIX + 'taskBlocked:' + taskId, value = { at: Date.now() };
+        await this.storage.set({ [key]: value });
+        if (stable((await this.storage.get(key))[key]) !== stable(value)) throw new Error('任务停止状态保存失败，请重试。');
+        return { taskId, blocked: true };
+      });
+    }
+    async undoAiTask(taskId) {
+      return this.serial(async () => {
+        if (!/^[\w-]{1,80}$/.test(taskId || '')) throw new Error('任务编号无效。');
+        const { records } = await this.all(), now = Date.now(), writes = { [PREFIX + 'taskBlocked:' + taskId]: { at: now } }; let undoneCount = 0;
+        for (const previous of records.values()) {
+          if (previous.aiTaskId !== taskId || previous.deleted) continue;
+          const record = { ...previous, deleted: true, revision: previous.revision + 1, updatedAt: now }, eventId = crypto.randomUUID();
+          writes[PREFIX + 'record:' + record.id] = record;
+          writes[PREFIX + 'event:' + eventId] = { id: eventId, recordId: record.id, kind: 'ai-task-undo', taskId, at: now, record }; undoneCount++;
+        }
+        await this.storage.set(writes);
+        const check = await this.storage.get(Object.keys(writes));
+        for (const key of Object.keys(writes)) if (stable(check[key]) !== stable(writes[key])) throw new Error('任务撤销校验失败，请重试。');
+        return { taskId, undoneCount };
       });
     }
     async listAiBatches(pageKey) {

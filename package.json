@@ -1,6 +1,6 @@
 {
   "name": "papertrail-reader",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "private": true,
   "description": "Local-first Chrome paper annotations with recoverable anchors",
   "scripts": {
@@ -10,7 +10,8 @@
     "bridge:setup": "node bridge/setup.mjs --install",
     "bridge:doctor": "node bridge/doctor.mjs",
     "test:bridge": "node tests/bridge-browser.mjs",
-    "test:bilingual": "node tests/bilingual-browser.cjs"
+    "test:bilingual": "node tests/bilingual-browser.cjs",
+    "test:tasks": "node tests/tasks-browser.mjs"
   },
   "devDependencies": {
     "jsdom": "^26.1.0",

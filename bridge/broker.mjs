@@ -4,8 +4,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { loadConfig, defaultConfigPath } from './config.mjs';
+import { TaskManager } from './tasks.mjs';
 
-export async function startBroker(config) {
+export async function startBroker(config, { taskStorePath, runnerFactory } = {}) {
   const pending = new Map(); let peer = null;
   const equal = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) && crypto.timingSafeEqual(Buffer.from(value), Buffer.from(config.token));
   const gateway = new WebSocketServer({ noServer: true, maxPayload: 12 * 1024 * 1024 });
@@ -19,9 +20,10 @@ export async function startBroker(config) {
     });
   }
   function answer(res, code, value) { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); }
+  const tasks = new TaskManager({ callExtension, storePath: taskStorePath, runnerFactory });
   const server = http.createServer(async (req, res) => {
     if (req.headers.origin || req.headers.host !== `127.0.0.1:${config.port}` || !equal(req.headers.authorization?.replace(/^Bearer /, ''))) return answer(res, 403, { error: 'Unauthorized' });
-    if (req.method === 'GET' && req.url === '/health') return answer(res, 200, { app: 'moji-codex-bridge', version: 1, connected: peer?.readyState === WebSocket.OPEN, extensionId: config.extensionId });
+    if (req.method === 'GET' && req.url === '/health') return answer(res, 200, { app: 'moji-codex-bridge', version: 1, connected: peer?.readyState === WebSocket.OPEN, extensionId: config.extensionId, capabilities: ['sidebar-tasks'] });
     if (req.method !== 'POST' || req.url !== '/rpc') return answer(res, 404, { error: 'Not found' });
     try {
       let size = 0; const chunks = [];
@@ -44,9 +46,20 @@ export async function startBroker(config) {
         if (!authenticated) {
           if (message.type !== 'hello' || !equal(message.token)) { ws.close(1008, 'Invalid connection file'); return; }
           if (peer && peer.readyState === WebSocket.OPEN) { ws.send(JSON.stringify({ type: 'error', error: '另一个浏览器已连接，请先在原浏览器断开。' })); ws.close(1008, 'Already connected'); return; }
-          clearTimeout(authTimer); authenticated = true; peer = ws; ws.send(JSON.stringify({ type: 'ready', version: 1 })); return;
+          clearTimeout(authTimer); authenticated = true; peer = ws; ws.send(JSON.stringify({ type: 'ready', version: 1, tasks: true })); return;
         }
         if (message.type === 'pong') return;
+        if (message.type === 'clientRequest' && typeof message.id === 'string') {
+          const run = async () => {
+            const args = message.args || {};
+            if (message.method === 'task.start') return tasks.start(args);
+            if (message.method === 'task.latest') return tasks.latest(args.url);
+            if (message.method === 'task.stop') return tasks.stop(args.id, args.url);
+            if (message.method === 'task.undo') return tasks.undo(args.id, args.url);
+            throw new Error('不支持此任务命令。');
+          };
+          run().then(value => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'clientResult', id: message.id, ok: true, value })); }, error => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'clientResult', id: message.id, ok: false, error: error.message })); }); return;
+        }
         if (message.type !== 'result' || typeof message.id !== 'string') return;
         const request = pending.get(message.id); if (!request) return;
         clearTimeout(request.timer); pending.delete(message.id);
@@ -60,6 +73,7 @@ export async function startBroker(config) {
         peer = null;
         for (const request of pending.values()) { clearTimeout(request.timer); request.reject(new Error('浏览器连接已断开。请查看批次列表确认操作结果后重试。')); }
         pending.clear();
+        tasks.close().catch(() => {});
       }
     });
   });
@@ -67,10 +81,10 @@ export async function startBroker(config) {
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(config.port, '127.0.0.1', resolve); });
   return {
     server,
-    async close() { clearInterval(heartbeat); for (const ws of gateway.clients) ws.terminate(); gateway.close(); await new Promise(resolve => server.close(resolve)); }
+    async close() { await tasks.close(); clearInterval(heartbeat); for (const ws of gateway.clients) ws.terminate(); gateway.close(); await new Promise(resolve => server.close(resolve)); }
   };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const configIndex = process.argv.indexOf('--config'), configPath = configIndex === -1 ? defaultConfigPath : process.argv[configIndex + 1];
-  startBroker(await loadConfig(configPath)).catch(error => { console.error('墨迹连接器启动失败：' + error.message); process.exitCode = 1; });
+  startBroker(await loadConfig(configPath), { taskStorePath: path.join(path.dirname(configPath), 'reading-tasks.json') }).catch(error => { console.error('墨迹连接器启动失败：' + error.message); process.exitCode = 1; });
 }

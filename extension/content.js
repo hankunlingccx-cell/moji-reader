@@ -5,6 +5,7 @@
   const A = MojiAnchor;
   const bilingual = MojiBilingual.tracker;
   const learned = new Map();
+  const unsavedInputs = new Map(); let contextInvalid = false, taskPanel;
   function uid() {
     if (crypto.randomUUID) return crypto.randomUUID();
     const bytes = crypto.getRandomValues(new Uint8Array(16)); bytes[6] = (bytes[6] & 15) | 64; bytes[8] = (bytes[8] & 63) | 128;
@@ -55,10 +56,12 @@
     #tooltip{background:rgba(255,255,255,.8);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);color:#3a3a3c;border-color:#ffffffdb;box-shadow:0 5px 24px #00000012,0 0 0 1px #00000008;border-radius:12px}#toast{background:rgba(255,255,255,.94);backdrop-filter:blur(18px);color:#1c1c1e;border:1px solid #e5e5ea;box-shadow:0 5px 24px #00000014;border-radius:12px}
     #color-hint{color:#8e8e93}#radial.ready #color-hint{color:#3a3a3c}#color-strip button.active .color-dot{box-shadow:0 0 0 2px #fff,0 0 0 3px #007aff}#color-strip button[aria-checked="true"]:after{background:#8e8e93}
     *{scrollbar-width:thin;scrollbar-color:#c7c7cc transparent}
+    #context-warning{padding:9px;background:#fff5e7;border:1px solid #f1dcc0;border-radius:9px;margin-top:8px;font-size:11px;color:#805b25;line-height:1.7}#context-warning button{background:white;border:1px solid #e5d4ba;border-radius:6px;margin:5px 5px 0 0;padding:4px 7px;font-size:11px}
   </style>
   <button id="launcher" title="打开墨迹标注侧栏"><span class="logo">墨</span><span>阅读标注</span><span id="launcher-count" class="muted">0</span></button>
   <section id="drawer" hidden aria-label="墨迹阅读标注侧栏">
-    <header><div class="row between"><div class="row"><span class="logo">墨</span><div><div class="eyebrow">PAPER NOTES</div><h1>阅读的痕迹</h1></div></div><button id="close" class="icon" title="关闭侧栏">×</button></div><div id="page-title"></div><a id="page-source" target="_blank" rel="noopener noreferrer">查看原文 ↗</a><div id="status" role="status" aria-live="polite">正在读取本地标注…</div></header>
+    <header><div class="row between"><div class="row"><span class="logo">墨</span><div><div class="eyebrow">PAPER NOTES</div><h1>阅读的痕迹</h1></div></div><button id="close" class="icon" title="关闭侧栏">×</button></div><div id="page-title"></div><a id="page-source" target="_blank" rel="noopener noreferrer">查看原文 ↗</a><div id="status" role="status" aria-live="polite">正在读取本地标注…</div><div id="context-warning" hidden>扩展已更新。未保存的输入仍保留在面板中，请先下载输入副本再刷新。<div><button id="context-download" type="button">下载输入副本</button><button id="context-refresh" type="button">刷新此页</button></div></div></header>
+    <details id="codex-task-panel"></details>
     <div id="tools" class="tools"><button id="undo" class="quiet" title="撤销上次标注修改">↶ 撤销</button><button id="redo" class="quiet">↷ 重做</button><button id="hide" class="quiet">隐藏标记</button><button id="retry" class="quiet">重新匹配</button><select id="filter" class="filter" aria-label="筛选标注"><option value="all">全部标注</option><option value="unanchored">待重新定位</option><option value="notes">含笔记</option><option value="drafts">有草稿</option><option value="deleted">回收站</option><option value="yellow">黄色 · 重要结论</option><option value="blue">蓝色 · 研究方法</option><option value="green">绿色 · 值得借鉴</option><option value="rose">红色 · 疑问待查</option><option value="purple">紫色 · 其他想法</option></select><input id="search" class="search" placeholder="搜索原文、标签或笔记…" aria-label="搜索当前论文标注"></div>
     <div id="list"></div><div id="editor" hidden></div><footer><span>仅保存在此浏览器 · 请定期备份</span><button id="library">标注库与备份 ↗</button></footer>
   </section>
@@ -81,18 +84,31 @@
     }
   }
   async function rpc(type, fields = {}) {
-    const result = await chrome.runtime.sendMessage({ type: 'moji:' + type, ...fields });
-    if (!result?.ok) throw new Error(result?.error || '插件连接中断。请保留输入内容，刷新网页后重试。');
-    return result.value;
+    try {
+      if (contextInvalid) throw new Error('Extension context invalidated.');
+      const result = await chrome.runtime.sendMessage({ type: 'moji:' + type, ...fields });
+      if (!result?.ok) throw new Error(result?.error || '插件连接中断。请保留输入内容，刷新网页后重试。'); return result.value;
+    } catch (error) { const info = MojiRuntimeErrors.describe(error); if (info.invalidated) invalidateContext(); throw new Error(info.message); }
   }
   function status(message, error = false) { $('status').textContent = message; $('status').className = error ? 'error' : ''; }
   let toastTimer;
   function toast(message, error = false) { $('toast').textContent = message; $('toast').hidden = false; $('toast').style.background = 'rgba(255,255,255,.94)'; $('toast').style.color = error ? '#d93025' : '#1c1c1e'; clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').hidden = true; }, error ? 9000 : 3300); }
-  function fail(error) { status(error.message, true); toast(error.message, true); }
-  function openDrawer() { $('drawer').hidden = false; $('launcher').hidden = true; }
+  function fail(error) { const info = MojiRuntimeErrors.describe(error); if (info.invalidated) invalidateContext(); if (!contextInvalid) { status(info.message, true); toast(info.message, true); } }
+  function invalidateContext() {
+    if (contextInvalid) return; contextInvalid = true; observer.disconnect(); clearTimeout(refreshTimer); taskPanel?.invalidate();
+    $('context-warning').hidden = false; status('墨迹已更新，请保留未保存输入后刷新此页。', true);
+    for (const b of ui.querySelectorAll('button')) if (!['context-download', 'context-refresh', 'close', 'launcher'].includes(b.id)) b.disabled = true;
+  }
+  function downloadRecovery() {
+    const payload = { app: 'moji-unsaved-input', pageKey: page, at: new Date().toISOString(), notes: [...unsavedInputs.values()], taskPrompt: taskPanel?.prompt() || '' };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })), a = document.createElement('a');
+    a.href = url; a.download = '墨迹-未保存输入-' + Date.now() + '.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  function openDrawer() { $('drawer').hidden = false; $('launcher').hidden = true; if (!contextInvalid) taskPanel?.refresh(); }
   function closeDrawer() { $('drawer').hidden = true; $('launcher').hidden = false; }
   function current(id) { return records.find(r => r.id === id); }
   function updateStatus() {
+    if (contextInvalid) return;
     const live = records.filter(r => !r.deleted), missing = live.filter(r => attached.get(r.id)?.status === 'unanchored').length;
     status(`已保存到本地 · ${live.length} 条标注${missing ? ` · ${missing} 条待重新定位` : ''}`);
     $('launcher-count').textContent = String(live.length); $('undo').disabled = !undo.length || busy; $('redo').disabled = !redo.length || busy;
@@ -108,7 +124,7 @@
     for (const parent of parents) parent.normalize();
   }
   function renderMarks() {
-    if (stopped) return;
+    if (stopped || contextInvalid) return;
     observer.disconnect();
     try {
       unwrap(); const index = bilingual.sync(A.buildIndex(document)); attached = new Map(); const ranges = [];
@@ -151,6 +167,7 @@
     finally { observe(); }
   }
   async function refresh() {
+    if (contextInvalid) return;
     const forPage = page, result = await rpc('list', { pageKey: forPage });
     if (forPage !== page) return;
     records = result.records; drafts = result.drafts;
@@ -297,6 +314,7 @@
     const draftState = text('div', useDraft ? '已找回保留的草稿，继续编辑即自动保存。' : '笔记与标签自动保存，无需手动提交。'); draftState.id = 'draft-state'; draftState.setAttribute('role', 'status');
     function noteChanged() {
       const sequence = ++target.sequence, value = { label: labelInput.value, note: noteInput.value };
+      unsavedInputs.set(id, { recordId: id, draftId: target.draftId, sequence, ...value });
       draftState.textContent = '正在自动保存…';
       const write = rpc('autosave', { id, draftId: target.draftId, baseRevision: target.baseRevision, sequence, ...value }).then(result => {
         if (result.conflict) {
@@ -307,6 +325,7 @@
         const local = current(id);
         if (!local || local.revision <= result.record.revision) { records = records.filter(r => r.id !== id); records.push(result.record); }
         if (editor === target && sequence === target.sequence) draftState.textContent = '已自动保存';
+        if (unsavedInputs.get(id)?.draftId === target.draftId && unsavedInputs.get(id)?.sequence === sequence) unsavedInputs.delete(id);
         renderList(); updateStatus();
       }).catch(error => { draftState.textContent = '自动保存失败，请保留输入并继续编辑重试。'; fail(error); throw error; });
       saveDraftChain = Promise.all([saveDraftChain.catch(() => {}), write]).then(() => {});
@@ -471,6 +490,7 @@
     if (message.type === 'moji:changed' && !busy) refresh().catch(fail);
   });
   function checkNavigation() {
+    if (contextInvalid) return;
     const next = A.pageKey(location.href);
     if (next !== page) {
       page = next; records = []; attached.clear(); pending = null; relinkId = null; undo = []; redo = []; closeEditor(); $('toolbar').hidden = true; $('mark-panel').hidden = true; closeRadial(); refresh().catch(fail);
@@ -483,5 +503,8 @@
   window.addEventListener('scroll', () => { $('toolbar').hidden = true; $('mark-panel').hidden = true; $('tooltip').hidden = true; }, { passive: true });
   window.addEventListener('pagehide', () => { stopped = true; observer.disconnect(); });
   window.addEventListener('pageshow', () => { stopped = false; refresh().catch(fail); });
+  taskPanel = MojiTaskPanel.mount({ ui, rpc, uid, isInvalid: () => contextInvalid });
+  $('context-download').addEventListener('click', downloadRecovery);
+  $('context-refresh').addEventListener('click', () => { if (unsavedInputs.size || taskPanel.prompt().trim()) downloadRecovery(); location.reload(); });
   applyPalette(palette); observe(); refresh().catch(fail);
 })();

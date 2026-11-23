@@ -10,6 +10,17 @@ class Storage {
 function setup() { const storage = new Storage(); return { storage, repo: new Repository(storage) }; }
 function patch(note = '') { return { pageKey: 'https://example.org/paper', title: 'Test paper', label: '', note, anchor: { exact: 'Original experiment', prefix: 'The ', suffix: ' was replicated.', start: 4, end: 23, version: 1 }, originalQuote: 'Original experiment', color: 'yellow', styles: { highlight: true, underline: false, bold: false }, deleted: false }; }
 const create = (repo, note = '') => repo.mutate({ id: 'record-1', baseRevision: 0, opId: crypto.randomUUID(), kind: 'create', patch: patch(note) });
+test('task undo spans multiple batches, retains latest notes and bilingual evidence, and blocks late writes', async () => {
+  const { repo } = setup(); const manual = await create(repo, 'manual note');
+  const batch = (id, offset, taskId) => repo.createAiBatch({ batchId: id, pageKey: manual.pageKey, title: manual.title, label: 'task', taskId, items: [{ index: 0, label: '因素', note: 'original note', color: 'green', anchor: { ...manual.anchor, start: offset, end: offset + manual.anchor.exact.length }, bilingual: bilingualValue() }] });
+  await batch('first', 100, 'job-1'); await batch('second', 200, 'job-1'); await batch('other', 300, 'job-2');
+  const r = (await repo.list()).records.find(r => r.aiBatchId === 'first');
+  await repo.mutate({ id: r.id, baseRevision: r.revision, opId: 'later-note', patch: { note: 'user edited note' } });
+  assert.equal((await repo.undoAiTask('job-1')).undoneCount, 2);
+  const saved = (await repo.list()).records.find(x => x.id === r.id); assert.equal(saved.note, 'user edited note'); assert.equal(saved.bilingual.variants.length, 1);
+  assert.equal((await repo.list()).records.find(x => x.aiTaskId === 'job-2').deleted, false); assert.equal((await repo.list()).records.find(x => x.id === manual.id).deleted, false);
+  await assert.rejects(batch('late', 400, 'job-1'), /已停止或撤销/); assert.equal((await repo.undoAiTask('job-1')).undoneCount, 0);
+});
 const bilingualValue = () => ({ version: 1, variants: [{ language: 'zh', scope: 'paragraph', anchor: { exact: '最初实验的中文译文，需要保留笔记和定位信息。', prefix: '', suffix: '', start: 0, end: 25, exactCount: 1, version: 1 } }] });
 
 test('learning bilingual evidence persists without changing note revision or disrupting autosave', async () => {

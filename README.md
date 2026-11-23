@@ -42,7 +42,7 @@ Local-first Chrome annotations with bilingual recovery, Markdown export, and Cod
 
 需要 **Chrome 120 或更新版本**。目前提供开发者模式安装包，未上架 Chrome 应用商店。
 
-1. 从 [Releases](../../releases/latest) 下载 `moji-reader-v1.9.0.zip`，解压到准备长期保留的目录；也可下载仓库源码。
+1. 从 [Releases](../../releases/latest) 下载 `moji-reader-v1.10.0.zip`，解压到准备长期保留的目录；也可下载仓库源码。
 2. 在 Chrome 地址栏打开 `chrome://extensions`，启用右上角「开发者模式」。
 3. 点击「加载已解压的扩展程序」，选择解压后的 **`extension` 文件夹**，其中应有 `manifest.json`。
 4. 刷新已打开的论文网页，选中文字开始标注；点击右下角入口或扩展图标打开侧栏。
@@ -61,11 +61,33 @@ Local-first Chrome annotations with bilingual recovery, Markdown export, and Cod
 
 ![选择标注并预览 Markdown 导出](docs/images/markdown-export.png)
 
+## 直接在侧栏交给 Codex
+
+完成下方的本机连接器配对后，打开网页右侧的墨迹侧栏，展开 **“交给 Codex”**。
+
+1. 写一句要求，例如“标出影响团队创意的因素”；也可点击“研究方法”“主要发现”“研究局限”填入快捷任务。
+2. 点击“开始”。本机连接器创建临时独立阅读会话，不带入你的开发聊天，并在该会话中停用无关 MCP、技能和应用。只向阅读工具绑定当前页面。
+3. 侧栏显示准备、阅读、写入、完成状态，以及已读段落和标注数量；Codex 返回用量信息时也显示 token 统计（不是费用估算）。
+4. “停止”中断本次生成并阻止后续写入，已写入标注保留。“整批撤销”覆盖该任务的全部提交批次，保留最新笔记和双语信息到回收站，不影响其他手动标注。
+5. 页面刷新后可查看最近任务；失败或已停止的任务也可以撤销。连接器重启会将未完成任务标记为停止，不会自动重跑。
+
+快捷任务不会自动执行，仍需点击开始。每个连接器同时运行一个阅读任务。每次任务最多运行 15 分钟，到时停止；已写入记录保留。
+
+![侧栏发起独立阅读任务](docs/images/codex-task-panel.png)
+
+> 任务截图来自协议测试，用量为模拟数据，不代表实际模型消耗。token 统计包含 Codex 报告的上下文和工具调用开销，不等同于文章字数或费用。
+
+侧栏任务使用本机 Codex CLI 的 App Server 动态工具接口（实验性）；已验证 CLI `0.167.0-alpha.4.1`。不同 CLI 版本可能需要适配。请先完成 CLI 登录；桌面聊天和侧栏独立会话的模型设置可能不同，实际使用量取决于本机配置。
+
+### 扩展更新后的提示
+
+扩展重新加载后，旧网页脚本会失效。v1.10 会明确提示刷新，并保留当前面板中的输入；可先下载“未保存输入副本”。若仍有未保存的笔记或任务输入，点击刷新时也会发起副本下载。请确认下载成功再离开页面，已保存的标注不会因刷新而删除。输入副本为明文 JSON，不会自动导入或上传。
+
 ## 连接桌面 Codex（可选）
 
 需要 Node.js 20+、npm，以及支持本地 MCP 服务的桌面 Codex。**墨迹不要求填写模型 API Key**；Codex 的账户、额度及使用规则由你的 Codex 环境决定。
 
-下载完整的 `moji-codex-v1.9.0.zip` 并解压，或使用仓库源码。在项目根目录运行：
+下载完整的 `moji-codex-v1.10.0.zip` 并解压，或使用仓库源码。在项目根目录运行：
 
 ```powershell
 npm ci --omit=dev
@@ -164,12 +186,13 @@ npx playwright install chromium
 npm run test:browser
 npm run test:bridge
 npm run test:bilingual
+npm run test:tasks
 npm run package
 ```
 
 `npm run package` 当前使用 PowerShell，生成扩展包与含连接器的完整包。Windows 测试在下载的 Chromium 无法启动时会尝试已安装的 Edge，也可通过 `MOJI_BROWSER=msedge` 指定。
 
-v1.9 验证：84 项逻辑测试、19 组基础浏览器场景、10 组 MCP 连接场景、4 组双语场景。使用隔离浏览器配置；双语测试模拟翻译 DOM 变化，不代表所有网站的谷歌翻译兼容保证。详见 [VERIFICATION.md](VERIFICATION.md)。
+v1.10 验证：94 项逻辑测试、19 组基础浏览器场景、10 组 MCP 连接场景、4 组双语场景和3组侧栏任务场景；另行通过本机真实 Codex 的虚构文章烟雾测试。使用隔离浏览器配置；双语测试模拟翻译 DOM 变化，不代表所有网站的谷歌翻译兼容保证。详见 [VERIFICATION.md](VERIFICATION.md)。
 
 `node scripts/demo-server.cjs` 启动虚构演示论文，访问 `http://127.0.0.1:8765/paper`。
 
